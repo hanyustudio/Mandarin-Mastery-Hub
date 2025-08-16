@@ -57,7 +57,6 @@
             background-color: #6b7280; /* Updated background color */
             max-width: 600px;
             width: 100%;
-            /* min-width: 0 is key to preventing overflow in grid layouts */
             min-width: 0; 
             aspect-ratio: 1 / 1;
         }
@@ -69,7 +68,6 @@
             background-color: #d1d5db; /* Gray-300, good contrast on dark bg */
             border-radius: 0.5rem;
             aspect-ratio: 1 / 1;
-            /* Use clamp to ensure font scales down on smaller screens */
             font-size: clamp(0.7rem, 2vw, 0.9rem); 
             font-weight: 700;
             color: #1f2937; /* Gray-900, good contrast */
@@ -358,7 +356,7 @@
             const generateBoard = (words) => {
                 let grid, placedWords;
                 let attempts = 0;
-                const maxAttempts = 500; // Added a safety break to avoid infinite loops
+                const maxAttempts = 500;
                 const directions = [
                     { x: 1, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }, { x: 1, y: -1 },
                     { x: -1, y: 0 }, { x: 0, y: -1 }, { x: -1, y: -1 }, { x: -1, y: 1 },
@@ -574,32 +572,9 @@
             };
             
             /**
-             * Checks if a cell is adjacent to the last selected cell.
-             */
-            const isAdjacent = (cell1, cell2) => {
-                const dx = Math.abs(cell1.x - cell2.x);
-                const dy = Math.abs(cell1.y - cell2.y);
-                return dx <= 1 && dy <= 1 && !(dx === 0 && dy === 0);
-            };
-
-            /**
-             * Updates the UI elements based on the current puzzle state.
-             */
-            const updateUI = () => {
-                renderGrid();
-                renderWordList();
-
-                const currentCategory = currentPuzzleState.category;
-                puzzleInfoElement.textContent = `${currentCategory} - Puzzle ${currentPuzzleIndex + 1} of ${NUM_PUZZLES}`;
-                leftArrow.classList.toggle('disabled', currentPuzzleIndex === 0);
-                rightArrow.classList.toggle('disabled', currentPuzzleIndex === NUM_PUZZLES - 1);
-            };
-            
-            /**
-             * A helper function to get the grid cell from event coordinates.
-             * Works for both mouse and touch events.
-             * @param {Event} event - The event object (either MouseEvent or TouchEvent).
-             * @returns {HTMLElement | null} The grid cell element, or null if not found.
+             * Gets the grid cell from event coordinates, accounting for both mouse and touch.
+             * @param {Event} event - The event object.
+             * @returns {HTMLElement | null} The grid cell element, or null.
              */
             const getCellFromEvent = (event) => {
                 let element;
@@ -613,39 +588,15 @@
                 return element?.closest('.grid-cell');
             };
 
-            // ---- Event Listeners for both Mouse and Touch ----
-
-            // Start drag
-            gameGrid.addEventListener('mousedown', startDrag);
-            gameGrid.addEventListener('touchstart', startDrag, { passive: false });
-
-            function startDrag(event) {
+            /**
+             * Main drag handler function for both mouse and touch events.
+             * @param {Event} event - The event object.
+             */
+            const handleDrag = (event) => {
+                // Ignore if a puzzle is already won or we're not dragging
                 if (currentPuzzleState.isGameWon) return;
-
-                const cellElement = getCellFromEvent(event);
-                if (!cellElement || cellElement.classList.contains('found-word')) {
-                    isDragging = false;
-                    return;
-                }
                 
-                isDragging = true;
-                currentPuzzleState.selectedCells = [];
-                const clickedCell = { 
-                    x: parseInt(cellElement.dataset.x), 
-                    y: parseInt(cellElement.dataset.y) 
-                };
-                currentPuzzleState.selectedCells.push(clickedCell);
-                updateUI();
-                event.preventDefault(); // Prevents default browser actions like text selection or scrolling
-            }
-
-            // Continue drag
-            gameGrid.addEventListener('mousemove', continueDrag);
-            gameGrid.addEventListener('touchmove', continueDrag, { passive: false });
-
-            function continueDrag(event) {
-                if (!isDragging || currentPuzzleState.isGameWon) return;
-                
+                // Get the cell under the pointer/finger
                 const cellElement = getCellFromEvent(event);
                 if (!cellElement) return;
 
@@ -653,51 +604,104 @@
                     x: parseInt(cellElement.dataset.x), 
                     y: parseInt(cellElement.dataset.y) 
                 };
-                const { selectedCells } = currentPuzzleState;
-                const lastSelectedCell = selectedCells[selectedCells.length - 1];
 
-                const isAlreadySelected = selectedCells.some(c => c.x === newCell.x && c.y === newCell.y);
-                if (isAlreadySelected || !isAdjacent(newCell, lastSelectedCell)) {
+                // Check if the cell is already selected to avoid duplicates
+                const isAlreadySelected = currentPuzzleState.selectedCells.some(c => c.x === newCell.x && c.y === newCell.y);
+                if (isAlreadySelected) {
                     return;
                 }
 
-                if (selectedCells.length === 1) {
-                    selectedCells.push(newCell);
+                // If this is the first cell, start the selection
+                if (currentPuzzleState.selectedCells.length === 0) {
+                    currentPuzzleState.selectedCells.push(newCell);
                 } else {
-                    const secondToLast = selectedCells[selectedCells.length - 2];
-                    const directionX = Math.sign(lastSelectedCell.x - secondToLast.x);
-                    const directionY = Math.sign(lastSelectedCell.y - secondToLast.y);
+                    const lastSelectedCell = currentPuzzleState.selectedCells[currentPuzzleState.selectedCells.length - 1];
+                    const isAdjacent = (cell1, cell2) => {
+                        const dx = Math.abs(cell1.x - cell2.x);
+                        const dy = Math.abs(cell1.y - cell2.y);
+                        return dx <= 1 && dy <= 1 && !(dx === 0 && dy === 0);
+                    };
 
-                    const newDirectionX = Math.sign(newCell.x - lastSelectedCell.x);
-                    const newDirectionY = Math.sign(newCell.y - lastSelectedCell.y);
-                    
-                    if (directionX === newDirectionX && directionY === newDirectionY) {
-                        selectedCells.push(newCell);
-                    } else {
-                        return;
+                    // Check if the new cell is adjacent to the last one
+                    if (isAdjacent(newCell, lastSelectedCell)) {
+                        // Check if the direction is the same as the initial drag direction
+                        if (currentPuzzleState.selectedCells.length === 1) {
+                            currentPuzzleState.selectedCells.push(newCell);
+                        } else {
+                            const secondToLast = currentPuzzleState.selectedCells[currentPuzzleState.selectedCells.length - 2];
+                            const directionX = Math.sign(lastSelectedCell.x - secondToLast.x);
+                            const directionY = Math.sign(lastSelectedCell.y - secondToLast.y);
+
+                            const newDirectionX = Math.sign(newCell.x - lastSelectedCell.x);
+                            const newDirectionY = Math.sign(newCell.y - lastSelectedCell.y);
+                            
+                            if (directionX === newDirectionX && directionY === newDirectionY) {
+                                currentPuzzleState.selectedCells.push(newCell);
+                            } else {
+                                // If direction changes, do not add the cell
+                                return;
+                            }
+                        }
                     }
                 }
                 updateUI();
-                event.preventDefault(); // Prevents default browser actions like scrolling during a drag
-            }
+            };
 
-            // End drag
-            document.addEventListener('mouseup', endDrag);
-            document.addEventListener('touchend', endDrag);
+            // ---- Event Listeners for both Mouse and Touch ----
+            gameGrid.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                handleDrag(e);
+            });
+            gameGrid.addEventListener('touchstart', (e) => {
+                isDragging = true;
+                handleDrag(e);
+                e.preventDefault(); // Prevents default scrolling on touch start
+            }, { passive: false });
 
-            function endDrag() {
+            document.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    handleDrag(e);
+                }
+            });
+            document.addEventListener('touchmove', (e) => {
+                if (isDragging) {
+                    handleDrag(e);
+                    e.preventDefault(); // Prevents default scrolling on touch move
+                }
+            }, { passive: false });
+
+            document.addEventListener('mouseup', () => {
                 if (isDragging) {
                     isDragging = false;
                     checkForWord();
                 }
-            }
-            
+            });
+            document.addEventListener('touchend', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    checkForWord();
+                }
+            });
+
             // Prevent text selection on the whole page during drag
             document.addEventListener('selectstart', (e) => {
                 if (isDragging) {
                     e.preventDefault();
                 }
             });
+
+            /**
+             * Updates the UI elements based on the current puzzle state.
+             */
+            const updateUI = () => {
+                renderGrid();
+                renderWordList();
+
+                const currentCategory = currentPuzzleState.category;
+                puzzleInfoElement.textContent = `${currentCategory} - Puzzle ${currentPuzzleIndex + 1} of ${NUM_PUZZLES}`;
+                leftArrow.classList.toggle('disabled', currentPuzzleIndex === 0);
+                rightArrow.classList.toggle('disabled', currentPuzzleIndex === NUM_PUZZLES - 1);
+            };
 
             // Other Event Listeners
             shuffleButton.addEventListener('click', shuffleCurrentPuzzle);
