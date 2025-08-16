@@ -336,7 +336,6 @@
             let allPuzzles = [];
             let currentPuzzleIndex = 0;
             let isDragging = false;
-
             let currentPuzzleState = {};
 
             /**
@@ -606,6 +605,7 @@
                 let element;
                 if (event.type.startsWith('touch')) {
                     const touch = event.touches[0];
+                    if (!touch) return null;
                     element = document.elementFromPoint(touch.clientX, touch.clientY);
                 } else {
                     element = event.target;
@@ -617,7 +617,7 @@
 
             // Start drag
             gameGrid.addEventListener('mousedown', startDrag);
-            gameGrid.addEventListener('touchstart', startDrag);
+            gameGrid.addEventListener('touchstart', startDrag, { passive: false });
 
             function startDrag(event) {
                 if (currentPuzzleState.isGameWon) return;
@@ -641,7 +641,7 @@
 
             // Continue drag
             gameGrid.addEventListener('mousemove', continueDrag);
-            gameGrid.addEventListener('touchmove', continueDrag);
+            gameGrid.addEventListener('touchmove', continueDrag, { passive: false });
 
             function continueDrag(event) {
                 if (!isDragging || currentPuzzleState.isGameWon) return;
@@ -678,7 +678,7 @@
                     }
                 }
                 updateUI();
-                event.preventDefault();
+                event.preventDefault(); // Prevents default browser actions like scrolling during a drag
             }
 
             // End drag
