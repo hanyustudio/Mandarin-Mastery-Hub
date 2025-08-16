@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pinyin Word Search</title>
+    <!-- Tailwind CSS CDN for utility classes -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts - Inter for a clean look -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c; /* Updated background color */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .game-container {
+            background-color: #ffffff;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2); /* Updated shadow */
+            padding: 2.5rem;
+            max-width: 1000px;
+            width: 100%;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .game-grid-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+        }
+        
+        @media (max-width: 768px) {
+            .game-grid-wrapper {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+
+        .game-grid-container {
+            display: grid;
+            grid-template-columns: repeat(15, 1fr);
+            gap: 4px;
+            border: 2px solid #6b7280; /* Updated border color */
+            border-radius: 0.75rem;
+            padding: 4px;
+            background-color: #6b7280; /* Updated background color */
+            max-width: 600px;
+            width: 100%;
+            /* min-width: 0 is key to preventing overflow in grid layouts */
+            min-width: 0; 
+            aspect-ratio: 1 / 1;
+        }
+
+        .grid-cell {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #d1d5db; /* Gray-300, good contrast on dark bg */
+            border-radius: 0.5rem;
+            aspect-ratio: 1 / 1;
+            /* Use clamp to ensure font scales down on smaller screens */
+            font-size: clamp(0.7rem, 2vw, 0.9rem); 
+            font-weight: 700;
+            color: #1f2937; /* Gray-900, good contrast */
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        .grid-cell:hover:not(.found-word) {
+            background-color: #9ca3af; /* Gray-400 */
+        }
+        .grid-cell.selected {
+            background-color: #3b82f6; /* Blue-500, kept for game function */
+            color: #fff;
+        }
+        .grid-cell.found-word {
+            background-color: #10b981; /* Green-500, kept for game function */
+            color: #fff;
+            cursor: default;
+        }
+        .nav-arrow {
+            width: 2.5rem;
+            height: 2.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #6b7280; /* Updated background color */
+            color: white;
+            border-radius: 9999px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .nav-arrow:hover {
+            background-color: #4b5563; /* Updated hover color */
+            transform: scale(1.1);
+        }
+        .nav-arrow.disabled {
+            background-color: #9ca3af; /* Updated disabled color */
+            cursor: not-allowed;
+            transform: none;
+            opacity: 0.5;
+        }
+
+        .word-list-container {
+            width: 100%;
+            margin-bottom: 1.5rem;
+        }
+        .word-list-container h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 1rem;
+        }
+        .word-list-container ul {
+            list-style: none;
+            padding: 0;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.5rem 1rem;
+        }
+        .word-list-container li {
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: #4b5563;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.5rem;
+            background-color: #e5e7eb;
+            transition: all 0.2s;
+        }
+        .word-item.found {
+            text-decoration: line-through;
+            color: #9ca3af;
+            font-style: italic;
+        }
+        .button {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        /* Using the red theme from the provided website for the secondary button */
+        .button-secondary {
+            background-color: #e53e3e; /* Updated color */
+            color: white;
+        }
+        .button-secondary:hover {
+            background-color: #c53030; /* Updated hover color */
+            transform: translateY(-2px);
+        }
+        .button-secondary:active {
+            transform: translateY(0);
+            box-shadow: none;
+        }
+        .button-tertiary {
+            background-color: #6b7280; /* Gray-500 for a new button */
+            color: white;
+        }
+        .button-tertiary:hover {
+            background-color: #4b5563; /* Gray-600 */
+            transform: translateY(-2px);
+        }
+        .button-tertiary:active {
+            transform: translateY(0);
+            box-shadow: none;
+        }
+        .feedback-message {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-top: 1rem;
+            min-height: 2rem;
+        }
+        .feedback-message.success {
+            color: #10b981; /* Green-500, kept for game function */
+        }
+        .feedback-message.error {
+            color: #e53e3e; /* Updated error color to match theme */
+        }
+        .puzzle-info {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #4b5563; /* Updated color for better contrast */
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1 class="text-4xl font-extrabold text-center text-gray-900">Pinyin Word Search</h1>
+
+        <div class="word-list-container">
+            <h2 class="text-center">Words to Find:</h2>
+            <ul id="word-list">
+                <!-- Words will be populated here -->
+            </ul>
+        </div>
+
+        <div class="puzzle-info" id="puzzle-info"></div>
+
+        <div class="game-grid-wrapper">
+            <div id="left-arrow" class="nav-arrow disabled">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M15 18l-6-6 6-6" />
+                </svg>
+            </div>
+            <div id="game-grid" class="game-grid-container">
+                <!-- Grid cells will be populated here -->
+            </div>
+            <div id="right-arrow" class="nav-arrow">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 18l6-6-6-6" />
+                </svg>
+            </div>
+        </div>
+        
+        <div class="flex items-center justify-center gap-4 flex-wrap">
+            <button id="shuffle-button" class="button button-secondary">Shuffle Puzzle</button>
+            <a href="index.html" class="button button-tertiary">Back to Homepage</a>
+        </div>
+        <div id="feedback-message" class="feedback-message">Drag to select letters in a straight line.</div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const gameGrid = document.getElementById('game-grid');
+            const wordListElement = document.getElementById('word-list');
+            const shuffleButton = document.getElementById('shuffle-button');
+            const feedbackMessageElement = document.getElementById('feedback-message');
+            const leftArrow = document.getElementById('left-arrow');
+            const rightArrow = document.getElementById('right-arrow');
+            const puzzleInfoElement = document.getElementById('puzzle-info');
+
+            const CATEGORIES = {
+                'Fruits': [
+                    { hanzi: '苹果', pinyin: 'pingguo' }, { hanzi: '梨', pinyin: 'li' },
+                    { hanzi: '香蕉', pinyin: 'xiangjiao' }, { hanzi: '芒果', pinyin: 'mangguo' },
+                    { hanzi: '橙子', pinyin: 'chengzi' }, { hanzi: '蓝莓', pinyin: 'lanmei' },
+                    { hanzi: '柠檬', pinyin: 'ningmeng' }, { hanzi: '青柠', pinyin: 'qingning' },
+                    { hanzi: '菠萝', pinyin: 'boluo' }, { hanzi: '覆盆子', pinyin: 'fupenzi' },
+                    { hanzi: '西瓜', pinyin: 'xigua' }, { hanzi: '草莓', pinyin: 'caomei' },
+                    { hanzi: '樱桃', pinyin: 'yingtao' }, { hanzi: '葡萄', pinyin: 'putao' },
+                    { hanzi: '桃子', pinyin: 'taozi' }, { hanzi: '李子', pinyin: 'lizi' },
+                    { hanzi: '椰子', pinyin: 'yezi' }, { hanzi: '石榴', pinyin: 'shiliu' },
+                    { hanzi: '木瓜', pinyin: 'mugua' }, { hanzi: '猕猴桃', pinyin: 'mihoutao' },
+                    { hanzi: '牛油果', pinyin: 'niuyouguo' },
+                ],
+                'Body Parts': [
+                    { hanzi: '脸', pinyin: 'lian' }, { hanzi: '鼻子', pinyin: 'bizi' },
+                    { hanzi: '耳朵', pinyin: 'erduo' }, { hanzi: '嘴巴', pinyin: 'zuiba' },
+                    { hanzi: '眼睛', pinyin: 'yanjing' }, { hanzi: '舌头', pinyin: 'shetou' },
+                    { hanzi: '嘴唇', pinyin: 'zuichun' }, { hanzi: '牙齿', pinyin: 'yachi' },
+                    { hanzi: '眉毛', pinyin: 'meimao' }, { hanzi: '脸颊', pinyin: 'lianjia' },
+                    { hanzi: '头发', pinyin: 'toufa' }, { hanzi: '头', pinyin: 'tou' },
+                    { hanzi: '肘', pinyin: 'zhou' }, { hanzi: '脖子', pinyin: 'bozi' },
+                    { hanzi: '胳膊', pinyin: 'gebo' }, { hanzi: '手指', pinyin: 'shouzhi' },
+                    { hanzi: '手', pinyin: 'shou' }, { hanzi: '脚', pinyin: 'jiao' },
+                    { hanzi: '脚趾', pinyin: 'jiaozhi' }, { hanzi: '腿', pinyin: 'tui' },
+                    { hanzi: '膝盖', pinyin: 'xigai' }, { hanzi: '肩膀', pinyin: 'jianbang' },
+                    { hanzi: '脚踝', pinyin: 'jiaohuai' }, { hanzi: '大脑', pinyin: 'danao' },
+                    { hanzi: '肺', pinyin: 'fei' }, { hanzi: '心', pinyin: 'xin' },
+                    { hanzi: '指甲', pinyin: 'zhijia' }, { hanzi: '手掌', pinyin: 'shouzhang' },
+                    { hanzi: '胃', pinyin: 'wei' }, { hanzi: '肠', pinyin: 'chang' },
+                    { hanzi: '小肠', pinyin: 'xiaochang' }, { hanzi: '大肠', pinyin: 'dachang' },
+                ],
+                'Farm Animals': [
+                    { hanzi: '小狗', pinyin: 'xiaogou' }, { hanzi: '小猫', pinyin: 'xiaomao' },
+                    { hanzi: '猫', pinyin: 'mao' }, { hanzi: '狗', pinyin: 'gou' },
+                    { hanzi: '鸡', pinyin: 'ji' }, { hanzi: '小鸡', pinyin: 'xiaoji' },
+                    { hanzi: '牛', pinyin: 'niu' }, { hanzi: '公牛', pinyin: 'gongniu' },
+                    { hanzi: '山羊', pinyin: 'shanyang' }, { hanzi: '羊', pinyin: 'yang' },
+                    { hanzi: '鸭子', pinyin: 'yazi' }, { hanzi: '鹅', pinyin: 'e' },
+                    { hanzi: '火鸡', pinyin: 'huoji' }, { hanzi: '公鸡', pinyin: 'gongji' },
+                    { hanzi: '猪', pinyin: 'zhu' }, { hanzi: '老鼠', pinyin: 'laoshu' },
+                    { hanzi: '马', pinyin: 'ma' }, { hanzi: '驴子', pinyin: 'luzi' },
+                    { hanzi: '兔子', pinyin: 'tuzi' }, { hanzi: '仓鼠', pinyin: 'cangshu' },
+                    { hanzi: '蜜蜂', pinyin: 'mifeng' },
+                ],
+                'Animals': [
+                    { hanzi: '老虎', pinyin: 'laohu' }, { hanzi: '狮子', pinyin: 'shizi' },
+                    { hanzi: '大象', pinyin: 'daxiang' }, { hanzi: '长颈鹿', pinyin: 'changjinglu' },
+                    { hanzi: '猴子', pinyin: 'houzi' }, { hanzi: '熊', pinyin: 'xiong' },
+                    { hanzi: '熊猫', pinyin: 'xiongmao' }, { hanzi: '狐狸', pinyin: 'huli' },
+                    { hanzi: '狼', pinyin: 'lang' }, { hanzi: '斑马', pinyin: 'banma' },
+                    { hanzi: '鳄鱼', pinyin: 'eyu' }, { hanzi: '鲨鱼', pinyin: 'shayu' },
+                    { hanzi: '鲸鱼', pinyin: 'jingyu' }, { hanzi: '海豚', pinyin: 'haitun' },
+                    { hanzi: '老鹰', pinyin: 'laoying' }, { hanzi: '猫头鹰', pinyin: 'maotouying' },
+                    { hanzi: '蛇', pinyin: 'she' }, { hanzi: '乌龟', pinyin: 'wugui' },
+                    { hanzi: '青蛙', pinyin: 'qingwa' }, { hanzi: '蜗牛', pinyin: 'woniu' },
+                ],
+                'Foods': [
+                    { hanzi: '米饭', pinyin: 'mifan' }, { hanzi: '面条', pinyin: 'miantiao' },
+                    { hanzi: '面包', pinyin: 'mianbao' }, { hanzi: '汤', pinyin: 'tang' },
+                    { hanzi: '沙拉', pinyin: 'shala' }, { hanzi: '蛋糕', pinyin: 'dangao' },
+                    { hanzi: '冰淇淋', pinyin: 'bingqilin' }, { hanzi: '巧克力', pinyin: 'qiaokeli' },
+                    { hanzi: '牛奶', pinyin: 'niunai' }, { hanzi: '水', pinyin: 'shui' },
+                    { hanzi: '果汁', pinyin: 'guozhi' }, { hanzi: '茶', pinyin: 'cha' },
+                    { hanzi: '咖啡', pinyin: 'kafei' }, { hanzi: '鸡蛋', pinyin: 'jidan' },
+                    { hanzi: '鱼', pinyin: 'yu' }, { hanzi: '肉', pinyin: 'rou' },
+                    { hanzi: '鸡肉', pinyin: 'jirou' }, { hanzi: '牛肉', pinyin: 'niurou' },
+                    { hanzi: '猪肉', pinyin: 'zhurou' }, { hanzi: '羊肉', pinyin: 'yangrou' },
+                ],
+                'House Items': [
+                    { hanzi: '椅子', pinyin: 'yizi' }, { hanzi: '桌子', pinyin: 'zhuozi' },
+                    { hanzi: '床', pinyin: 'chuang' }, { hanzi: '沙发', pinyin: 'shafa' },
+                    { hanzi: '灯', pinyin: 'deng' }, { hanzi: '窗户', pinyin: 'chuanghu' },
+                    { hanzi: '门', pinyin: 'men' }, { hanzi: '厨房', pinyin: 'chufang' },
+                    { hanzi: '浴室', pinyin: 'yushi' }, { hanzi: '卧室', pinyin: 'woshi' },
+                    { hanzi: '客厅', pinyin: 'keting' }, { hanzi: '电视', pinyin: 'dianshi' },
+                    { hanzi: '冰箱', pinyin: 'bingxiang' }, { hanzi: '电脑', pinyin: 'diannao' },
+                    { hanzi: '手机', pinyin: 'shouji' }, { hanzi: '书', pinyin: 'shu' },
+                    { hanzi: '笔', pinyin: 'bi' }, { hanzi: '剪刀', pinyin: 'jiandao' },
+                    { hanzi: '钱包', pinyin: 'qianbao' }, { hanzi: '钥匙', pinyin: 'yaoshi' },
+                ]
+            };
+            
+            const CATEGORY_NAMES = Object.keys(CATEGORIES);
+            const NUM_PUZZLES = CATEGORY_NAMES.length;
+            const FILLER_CHARS = 'abcdefghijklmnopqrstuvwxyz';
+            const GRID_SIZE = 15;
+            const WORDS_PER_PUZZLE = 10;
+
+            let allPuzzles = [];
+            let currentPuzzleIndex = 0;
+            let isDragging = false;
+
+            let currentPuzzleState = {};
+
+            /**
+             * Selects a random subset of words from a given array.
+             * @param {Array<Object>} words - The full list of words to choose from.
+             * @param {number} count - The number of words to select.
+             * @returns {Array<Object>} A new array containing the random subset of words.
+             */
+            const selectRandomWords = (words, count) => {
+                const shuffled = [...words].sort(() => 0.5 - Math.random());
+                return shuffled.slice(0, count);
+            };
+
+            /**
+             * Generates a new word search board for a given list of words.
+             * It will retry until all words are successfully placed.
+             * @param {Array<Object>} words - The list of words to place on the board.
+             * @returns {{grid: string[][], placedWords: Array<Object>}} The generated grid and the list of placed words with their paths.
+             */
+            const generateBoard = (words) => {
+                let grid, placedWords;
+                let attempts = 0;
+                const maxAttempts = 500; // Added a safety break to avoid infinite loops
+                const directions = [
+                    { x: 1, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }, { x: 1, y: -1 },
+                    { x: -1, y: 0 }, { x: 0, y: -1 }, { x: -1, y: -1 }, { x: -1, y: 1 },
+                ];
+
+                while (true) {
+                    grid = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(''));
+                    placedWords = [];
+                    const shuffledWords = [...words].sort(() => Math.random() - 0.5);
+
+                    shuffledWords.forEach(word => {
+                        const pinyin = word.pinyin;
+                        for (let wordAttempts = 0; wordAttempts < 50; wordAttempts++) {
+                            const direction = directions[Math.floor(Math.random() * directions.length)];
+                            const startX = Math.floor(Math.random() * GRID_SIZE);
+                            const startY = Math.floor(Math.random() * GRID_SIZE);
+                            let fits = true;
+                            let path = [];
+
+                            if (startX + direction.x * (pinyin.length - 1) >= GRID_SIZE ||
+                                startX + direction.x * (pinyin.length - 1) < 0 ||
+                                startY + direction.y * (pinyin.length - 1) >= GRID_SIZE ||
+                                startY + direction.y * (pinyin.length - 1) < 0) {
+                                fits = false;
+                            }
+
+                            if (fits) {
+                                for (let i = 0; i < pinyin.length; i++) {
+                                    const char = pinyin[i];
+                                    const newX = startX + direction.x * i;
+                                    const newY = startY + direction.y * i;
+                                    if (grid[newY][newX] !== '' && grid[newY][newX] !== char) {
+                                        fits = false;
+                                        break;
+                                    }
+                                    path.push({ x: newX, y: newY });
+                                }
+                            }
+
+                            if (fits) {
+                                for (let i = 0; i < pinyin.length; i++) {
+                                    const char = pinyin[i];
+                                    const newX = startX + direction.x * i;
+                                    const newY = startY + direction.y * i;
+                                    grid[newY][newX] = char;
+                                }
+                                placedWords.push({
+                                    hanzi: word.hanzi,
+                                    pinyin: word.pinyin,
+                                    path: path
+                                });
+                                break;
+                            }
+                        }
+                    });
+
+                    // If all words were placed, break the loop
+                    if (placedWords.length === words.length || attempts > maxAttempts) {
+                        break;
+                    }
+                    attempts++;
+                }
+
+                // Fill remaining empty cells with random letters
+                for (let y = 0; y < GRID_SIZE; y++) {
+                    for (let x = 0; x < GRID_SIZE; x++) {
+                        if (grid[y][x] === '') {
+                            grid[y][x] = FILLER_CHARS[Math.floor(Math.random() * FILLER_CHARS.length)];
+                        }
+                    }
+                }
+                return { grid, placedWords };
+            };
+
+            /**
+             * Generates a new set of puzzles for all categories.
+             */
+            const generateAllPuzzles = () => {
+                allPuzzles = [];
+                CATEGORY_NAMES.forEach(categoryName => {
+                    const wordsForCategory = selectRandomWords(CATEGORIES[categoryName], WORDS_PER_PUZZLE);
+                    const newBoard = generateBoard(wordsForCategory);
+                    allPuzzles.push({
+                        ...newBoard,
+                        category: categoryName,
+                        foundWords: [],
+                        selectedCells: [],
+                        isGameWon: false,
+                    });
+                });
+                currentPuzzleIndex = 0;
+                loadPuzzle(currentPuzzleIndex);
+            };
+
+            /**
+             * Shuffles the words in the current puzzle to create a new board.
+             */
+            const shuffleCurrentPuzzle = () => {
+                const currentCategory = CATEGORY_NAMES[currentPuzzleIndex];
+                const wordsForCategory = selectRandomWords(CATEGORIES[currentCategory], WORDS_PER_PUZZLE);
+                const newBoard = generateBoard(wordsForCategory);
+                allPuzzles[currentPuzzleIndex] = {
+                    ...newBoard,
+                    category: currentCategory,
+                    foundWords: [],
+                    selectedCells: [],
+                    isGameWon: false,
+                };
+                loadPuzzle(currentPuzzleIndex);
+            };
+
+            /**
+             * Loads and displays a specific puzzle by its index.
+             * @param {number} index - The index of the puzzle to load.
+             */
+            const loadPuzzle = (index) => {
+                currentPuzzleState = allPuzzles[index];
+                feedbackMessageElement.textContent = currentPuzzleState.isGameWon ? "Puzzle Complete!" : "Drag to select letters in a straight line.";
+                feedbackMessageElement.classList.remove('success', 'error');
+                if (currentPuzzleState.isGameWon) {
+                    feedbackMessageElement.classList.add('success');
+                }
+                updateUI();
+            };
+
+            /**
+             * Renders the game grid based on the current puzzle state.
+             */
+            const renderGrid = () => {
+                gameGrid.innerHTML = '';
+                const { grid, foundWords, placedWords, selectedCells } = currentPuzzleState;
+                grid.forEach((row, y) => {
+                    row.forEach((char, x) => {
+                        const cell = document.createElement('div');
+                        cell.classList.add('grid-cell');
+                        cell.dataset.x = x;
+                        cell.dataset.y = y;
+                        cell.textContent = char;
+
+                        const isSelected = selectedCells.some(c => c.x === x && c.y === y);
+                        const isFound = foundWords.some(foundHanzi => {
+                            const placedWord = placedWords.find(word => word.hanzi === foundHanzi);
+                            return placedWord?.path.some(c => c.x === x && c.y === y);
+                        });
+
+                        if (isSelected) {
+                            cell.classList.add('selected');
+                        }
+                        if (isFound) {
+                            cell.classList.add('found-word');
+                        }
+
+                        gameGrid.appendChild(cell);
+                    });
+                });
+            };
+
+            /**
+             * Renders the list of words to be found.
+             */
+            const renderWordList = () => {
+                wordListElement.innerHTML = '';
+                const { placedWords, foundWords } = currentPuzzleState;
+                placedWords.forEach(word => {
+                    const listItem = document.createElement('li');
+                    listItem.classList.add('word-item');
+                    if (foundWords.includes(word.hanzi)) {
+                        listItem.classList.add('found');
+                    }
+                    listItem.textContent = `${word.pinyin} (${word.hanzi})`;
+                    wordListElement.appendChild(listItem);
+                });
+            };
+
+            /**
+             * Checks if the current selection of cells matches a placed word.
+             */
+            const checkForWord = () => {
+                const { selectedCells, placedWords, foundWords } = currentPuzzleState;
+                if (selectedCells.length < 2) return;
+                
+                const pinyinForward = selectedCells.map(c => currentPuzzleState.grid[c.y][c.x]).join('');
+                const pinyinBackward = [...selectedCells].reverse().map(c => currentPuzzleState.grid[c.y][c.x]).join('');
+
+                const foundWord = placedWords.find(word => {
+                    return (
+                        !foundWords.includes(word.hanzi) && 
+                        (word.pinyin === pinyinForward || word.pinyin === pinyinBackward)
+                    );
+                });
+
+                if (foundWord) {
+                    // Found a new word!
+                    currentPuzzleState.foundWords.push(foundWord.hanzi);
+                    feedbackMessageElement.textContent = `Great job! You found "${foundWord.hanzi}" (${foundWord.pinyin})!`;
+                    feedbackMessageElement.classList.remove('error');
+                    feedbackMessageElement.classList.add('success');
+                    
+                    if (currentPuzzleState.foundWords.length === placedWords.length) {
+                        currentPuzzleState.isGameWon = true;
+                        feedbackMessageElement.textContent = "Congratulations! You've found all the words!";
+                    }
+                    
+                } else {
+                    feedbackMessageElement.textContent = `That's not a word! Try again.`;
+                    feedbackMessageElement.classList.remove('success');
+                    feedbackMessageElement.classList.add('error');
+                }
+
+                // Clear selection and update UI after checking
+                currentPuzzleState.selectedCells = [];
+                updateUI();
+            };
+            
+            /**
+             * Checks if a cell is adjacent to the last selected cell.
+             */
+            const isAdjacent = (cell1, cell2) => {
+                const dx = Math.abs(cell1.x - cell2.x);
+                const dy = Math.abs(cell1.y - cell2.y);
+                return dx <= 1 && dy <= 1 && !(dx === 0 && dy === 0);
+            };
+
+            /**
+             * Updates the UI elements based on the current puzzle state.
+             */
+            const updateUI = () => {
+                renderGrid();
+                renderWordList();
+
+                const currentCategory = currentPuzzleState.category;
+                puzzleInfoElement.textContent = `${currentCategory} - Puzzle ${currentPuzzleIndex + 1} of ${NUM_PUZZLES}`;
+                leftArrow.classList.toggle('disabled', currentPuzzleIndex === 0);
+                rightArrow.classList.toggle('disabled', currentPuzzleIndex === NUM_PUZZLES - 1);
+            };
+
+            // ---- New Drag-based Selection Event Handler ----
+            gameGrid.addEventListener('mousedown', (event) => {
+                if (currentPuzzleState.isGameWon) return;
+
+                const cellElement = event.target.closest('.grid-cell');
+                if (!cellElement || cellElement.classList.contains('found-word')) {
+                    isDragging = false;
+                    return;
+                }
+                
+                isDragging = true;
+                currentPuzzleState.selectedCells = [];
+                const clickedCell = { 
+                    x: parseInt(cellElement.dataset.x), 
+                    y: parseInt(cellElement.dataset.y) 
+                };
+                currentPuzzleState.selectedCells.push(clickedCell);
+                updateUI();
+
+                // Prevent default drag behavior
+                event.preventDefault();
+            });
+
+            gameGrid.addEventListener('mouseover', (event) => {
+                if (!isDragging || currentPuzzleState.isGameWon) return;
+                
+                const cellElement = event.target.closest('.grid-cell');
+                if (!cellElement) return;
+
+                const newCell = { 
+                    x: parseInt(cellElement.dataset.x), 
+                    y: parseInt(cellElement.dataset.y) 
+                };
+                const { selectedCells } = currentPuzzleState;
+                const lastSelectedCell = selectedCells[selectedCells.length - 1];
+
+                // Check for duplicate or non-adjacent cell
+                const isAlreadySelected = selectedCells.some(c => c.x === newCell.x && c.y === newCell.y);
+                if (isAlreadySelected || !isAdjacent(newCell, lastSelectedCell)) {
+                    // Do not add this cell if it's already in the selection or not adjacent
+                    return;
+                }
+
+                if (selectedCells.length === 1) {
+                    // This is the second cell, establish the direction
+                    selectedCells.push(newCell);
+                } else {
+                    // Check if the new cell continues the established direction
+                    const secondToLast = selectedCells[selectedCells.length - 2];
+                    const directionX = Math.sign(lastSelectedCell.x - secondToLast.x);
+                    const directionY = Math.sign(lastSelectedCell.y - secondToLast.y);
+
+                    const newDirectionX = Math.sign(newCell.x - lastSelectedCell.x);
+                    const newDirectionY = Math.sign(newCell.y - lastSelectedCell.y);
+                    
+                    if (directionX === newDirectionX && directionY === newDirectionY) {
+                        selectedCells.push(newCell);
+                    } else {
+                        // If direction changes, do not add the cell
+                        return;
+                    }
+                }
+                updateUI();
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    checkForWord();
+                }
+            });
+
+            // Prevent text selection on the whole page during drag
+            document.addEventListener('selectstart', (e) => {
+                if (isDragging) {
+                    e.preventDefault();
+                }
+            });
+
+            // Other Event Listeners
+            shuffleButton.addEventListener('click', shuffleCurrentPuzzle);
+            
+            leftArrow.addEventListener('click', () => {
+                if (currentPuzzleIndex > 0) {
+                    currentPuzzleIndex--;
+                    loadPuzzle(currentPuzzleIndex);
+                }
+            });
+            rightArrow.addEventListener('click', () => {
+                if (currentPuzzleIndex < NUM_PUZZLES - 1) {
+                    currentPuzzleIndex++;
+                    loadPuzzle(currentPuzzleIndex);
+                }
+            });
+
+            // Initial game load
+            generateAllPuzzles();
+        });
+    </script>
+</body>
+</html>
