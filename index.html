@@ -48,7 +48,7 @@
         }
 
         .game-grid-container {
-            /* GRID SIZE IS NOW 11x11 FOR MOBILE */
+            /* GRID SIZE IS 11x11 FOR MOBILE */
             display: grid;
             grid-template-columns: repeat(11, 1fr); 
             gap: 3px; /* Reduced gap */
@@ -229,7 +229,7 @@
             <button id="shuffle-button" class="button button-secondary">Shuffle Puzzle</button>
             <a href="index.html" class="button button-tertiary">Back to Homepage</a>
         </div>
-        <div id="feedback-message" class="feedback-message">Drag to select letters in a straight line.</div>
+        <div id="feedback-message" class="feedback-message">Click the first and last letters of a word.</div>
     </div>
 
     <script>
@@ -328,13 +328,13 @@
             const CATEGORY_NAMES = Object.keys(CATEGORIES);
             const NUM_PUZZLES = CATEGORY_NAMES.length;
             const FILLER_CHARS = 'abcdefghijklmnopqrstuvwxyz';
-            const GRID_SIZE = 11; // Updated to 11 for mobile
+            const GRID_SIZE = 11; // 11x11 grid for mobile
             const WORDS_PER_PUZZLE = 8; // Reduced words for smaller grid
 
             let allPuzzles = [];
             let currentPuzzleIndex = 0;
-            let isDragging = false;
             let currentPuzzleState = {};
+            let startCell = null;
 
             /**
              * Selects a random subset of words from a given array.
@@ -474,7 +474,8 @@
              */
             const loadPuzzle = (index) => {
                 currentPuzzleState = allPuzzles[index];
-                feedbackMessageElement.textContent = currentPuzzleState.isGameWon ? "Puzzle Complete!" : "Drag to select letters in a straight line.";
+                startCell = null;
+                feedbackMessageElement.textContent = currentPuzzleState.isGameWon ? "Puzzle Complete!" : "Click the first and last letters of a word.";
                 feedbackMessageElement.classList.remove('success', 'error');
                 if (currentPuzzleState.isGameWon) {
                     feedbackMessageElement.classList.add('success');
@@ -536,9 +537,12 @@
              */
             const checkForWord = () => {
                 const { selectedCells, placedWords, foundWords } = currentPuzzleState;
+                
                 if (selectedCells.length < 2) {
-                    // Reset selected cells on a failed guess or single-cell click
                     currentPuzzleState.selectedCells = [];
+                    feedbackMessageElement.textContent = `Selection too short. Click start and end letters.`;
+                    feedbackMessageElement.classList.remove('success');
+                    feedbackMessageElement.classList.add('error');
                     updateUI();
                     return;
                 }
@@ -554,7 +558,6 @@
                 });
 
                 if (foundWord) {
-                    // Found a new word!
                     currentPuzzleState.foundWords.push(foundWord.hanzi);
                     feedbackMessageElement.textContent = `Great job! You found "${foundWord.hanzi}" (${foundWord.pinyin})!`;
                     feedbackMessageElement.classList.remove('error');
@@ -571,121 +574,75 @@
                     feedbackMessageElement.classList.add('error');
                 }
 
-                // Clear selection and update UI after checking
                 currentPuzzleState.selectedCells = [];
+                startCell = null;
                 updateUI();
             };
-            
+
             /**
-             * Gets the grid cell from event coordinates, accounting for both mouse and touch.
-             * @param {Event} event - The event object.
-             * @returns {HTMLElement | null} The grid cell element, or null.
+             * Gets the path of cells between a start and end cell.
+             * @param {{x: number, y: number}} start - The starting cell coordinates.
+             * @param {{x: number, y: number}} end - The ending cell coordinates.
+             * @returns {Array<{x: number, y: number}> | null} An array of cell coordinates, or null if the path is not a straight line.
              */
-            const getCellFromEvent = (event) => {
-                let element;
-                if (event.type.startsWith('touch')) {
-                    const touch = event.touches[0];
-                    if (!touch) return null;
-                    element = document.elementFromPoint(touch.clientX, touch.clientY);
-                } else {
-                    element = event.target;
+            const getPathBetween = (start, end) => {
+                const path = [];
+                const dx = end.x - start.x;
+                const dy = end.y - start.y;
+                const adx = Math.abs(dx);
+                const ady = Math.abs(dy);
+                const steps = Math.max(adx, ady);
+
+                if (dx !== 0 && dy !== 0 && adx !== ady) {
+                    return null; // Not a straight diagonal line
                 }
-                return element?.closest('.grid-cell');
-            };
-
-            /**
-             * Main drag handler function for both mouse and touch events.
-             * @param {Event} event - The event object.
-             */
-            const handleDrag = (event) => {
-                if (currentPuzzleState.isGameWon) return;
                 
-                const cellElement = getCellFromEvent(event);
-                if (!cellElement) return;
+                const sx = dx === 0 ? 0 : dx / adx;
+                const sy = dy === 0 ? 0 : dy / ady;
 
-                const newCell = { 
-                    x: parseInt(cellElement.dataset.x), 
-                    y: parseInt(cellElement.dataset.y) 
-                };
-
-                const isAlreadySelected = currentPuzzleState.selectedCells.some(c => c.x === newCell.x && c.y === newCell.y);
-                if (isAlreadySelected) {
+                for (let i = 0; i <= steps; i++) {
+                    path.push({
+                        x: start.x + i * sx,
+                        y: start.y + i * sy
+                    });
+                }
+                return path;
+            };
+            
+            // New click handler for the game grid
+            gameGrid.addEventListener('click', (e) => {
+                const cellElement = e.target.closest('.grid-cell');
+                if (!cellElement || currentPuzzleState.isGameWon || cellElement.classList.contains('found-word')) {
                     return;
                 }
 
-                if (currentPuzzleState.selectedCells.length === 0) {
-                    currentPuzzleState.selectedCells.push(newCell);
+                const clickedCell = {
+                    x: parseInt(cellElement.dataset.x),
+                    y: parseInt(cellElement.dataset.y)
+                };
+
+                if (!startCell) {
+                    // This is the first click
+                    startCell = clickedCell;
+                    currentPuzzleState.selectedCells = [startCell];
+                    feedbackMessageElement.textContent = "Now click the last letter of the word.";
                 } else {
-                    const lastSelectedCell = currentPuzzleState.selectedCells[currentPuzzleState.selectedCells.length - 1];
-                    const isAdjacent = (cell1, cell2) => {
-                        const dx = Math.abs(cell1.x - cell2.x);
-                        const dy = Math.abs(cell1.y - cell2.y);
-                        return dx <= 1 && dy <= 1 && !(dx === 0 && dy === 0);
-                    };
+                    // This is the second click
+                    const endCell = clickedCell;
+                    const path = getPathBetween(startCell, endCell);
 
-                    if (isAdjacent(newCell, lastSelectedCell)) {
-                        if (currentPuzzleState.selectedCells.length === 1) {
-                            currentPuzzleState.selectedCells.push(newCell);
-                        } else {
-                            const secondToLast = currentPuzzleState.selectedCells[currentPuzzleState.selectedCells.length - 2];
-                            const directionX = Math.sign(lastSelectedCell.x - secondToLast.x);
-                            const directionY = Math.sign(lastSelectedCell.y - secondToLast.y);
-
-                            const newDirectionX = Math.sign(newCell.x - lastSelectedCell.x);
-                            const newDirectionY = Math.sign(newCell.y - lastSelectedCell.y);
-                            
-                            if (directionX === newDirectionX && directionY === newDirectionY) {
-                                currentPuzzleState.selectedCells.push(newCell);
-                            } else {
-                                return;
-                            }
-                        }
+                    if (path) {
+                        currentPuzzleState.selectedCells = path;
+                        checkForWord();
+                    } else {
+                        feedbackMessageElement.textContent = "Invalid selection. Please click start and end letters in a straight line.";
+                        feedbackMessageElement.classList.remove('success');
+                        feedbackMessageElement.classList.add('error');
+                        currentPuzzleState.selectedCells = [];
+                        startCell = null;
                     }
                 }
                 updateUI();
-            };
-
-            // ---- Event Listeners for both Mouse and Touch ----
-            gameGrid.addEventListener('mousedown', (e) => {
-                isDragging = true;
-                handleDrag(e);
-            });
-            gameGrid.addEventListener('touchstart', (e) => {
-                isDragging = true;
-                handleDrag(e);
-                e.preventDefault();
-            }, { passive: false });
-
-            document.addEventListener('mousemove', (e) => {
-                if (isDragging) {
-                    handleDrag(e);
-                }
-            });
-            document.addEventListener('touchmove', (e) => {
-                if (isDragging) {
-                    handleDrag(e);
-                    e.preventDefault();
-                }
-            }, { passive: false });
-
-            document.addEventListener('mouseup', () => {
-                if (isDragging) {
-                    isDragging = false;
-                    checkForWord();
-                }
-            });
-            document.addEventListener('touchend', () => {
-                if (isDragging) {
-                    isDragging = false;
-                    checkForWord();
-                }
-            });
-
-            // Prevent text selection on the whole page during drag
-            document.addEventListener('selectstart', (e) => {
-                if (isDragging) {
-                    e.preventDefault();
-                }
             });
 
             /**
