@@ -595,12 +595,34 @@
                 leftArrow.classList.toggle('disabled', currentPuzzleIndex === 0);
                 rightArrow.classList.toggle('disabled', currentPuzzleIndex === NUM_PUZZLES - 1);
             };
+            
+            /**
+             * A helper function to get the grid cell from event coordinates.
+             * Works for both mouse and touch events.
+             * @param {Event} event - The event object (either MouseEvent or TouchEvent).
+             * @returns {HTMLElement | null} The grid cell element, or null if not found.
+             */
+            const getCellFromEvent = (event) => {
+                let element;
+                if (event.type.startsWith('touch')) {
+                    const touch = event.touches[0];
+                    element = document.elementFromPoint(touch.clientX, touch.clientY);
+                } else {
+                    element = event.target;
+                }
+                return element?.closest('.grid-cell');
+            };
 
-            // ---- New Drag-based Selection Event Handler ----
-            gameGrid.addEventListener('mousedown', (event) => {
+            // ---- Event Listeners for both Mouse and Touch ----
+
+            // Start drag
+            gameGrid.addEventListener('mousedown', startDrag);
+            gameGrid.addEventListener('touchstart', startDrag);
+
+            function startDrag(event) {
                 if (currentPuzzleState.isGameWon) return;
 
-                const cellElement = event.target.closest('.grid-cell');
+                const cellElement = getCellFromEvent(event);
                 if (!cellElement || cellElement.classList.contains('found-word')) {
                     isDragging = false;
                     return;
@@ -614,15 +636,17 @@
                 };
                 currentPuzzleState.selectedCells.push(clickedCell);
                 updateUI();
+                event.preventDefault(); // Prevents default browser actions like text selection or scrolling
+            }
 
-                // Prevent default drag behavior
-                event.preventDefault();
-            });
+            // Continue drag
+            gameGrid.addEventListener('mousemove', continueDrag);
+            gameGrid.addEventListener('touchmove', continueDrag);
 
-            gameGrid.addEventListener('mouseover', (event) => {
+            function continueDrag(event) {
                 if (!isDragging || currentPuzzleState.isGameWon) return;
                 
-                const cellElement = event.target.closest('.grid-cell');
+                const cellElement = getCellFromEvent(event);
                 if (!cellElement) return;
 
                 const newCell = { 
@@ -632,18 +656,14 @@
                 const { selectedCells } = currentPuzzleState;
                 const lastSelectedCell = selectedCells[selectedCells.length - 1];
 
-                // Check for duplicate or non-adjacent cell
                 const isAlreadySelected = selectedCells.some(c => c.x === newCell.x && c.y === newCell.y);
                 if (isAlreadySelected || !isAdjacent(newCell, lastSelectedCell)) {
-                    // Do not add this cell if it's already in the selection or not adjacent
                     return;
                 }
 
                 if (selectedCells.length === 1) {
-                    // This is the second cell, establish the direction
                     selectedCells.push(newCell);
                 } else {
-                    // Check if the new cell continues the established direction
                     const secondToLast = selectedCells[selectedCells.length - 2];
                     const directionX = Math.sign(lastSelectedCell.x - secondToLast.x);
                     const directionY = Math.sign(lastSelectedCell.y - secondToLast.y);
@@ -654,20 +674,24 @@
                     if (directionX === newDirectionX && directionY === newDirectionY) {
                         selectedCells.push(newCell);
                     } else {
-                        // If direction changes, do not add the cell
                         return;
                     }
                 }
                 updateUI();
-            });
+                event.preventDefault();
+            }
 
-            document.addEventListener('mouseup', () => {
+            // End drag
+            document.addEventListener('mouseup', endDrag);
+            document.addEventListener('touchend', endDrag);
+
+            function endDrag() {
                 if (isDragging) {
                     isDragging = false;
                     checkForWord();
                 }
-            });
-
+            }
+            
             // Prevent text selection on the whole page during drag
             document.addEventListener('selectstart', (e) => {
                 if (isDragging) {
